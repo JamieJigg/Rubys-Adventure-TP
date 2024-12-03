@@ -1,10 +1,11 @@
 fileFormatVersion: 2
-guid: d8fc758c075589248acb939d80cf0d65
+guid: 1a7bd41952d0db5458987b819f953a09
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2
   defaultReferences:
-  - collectedClip: {fileID: 8300000, guid: 173a14cf06354c643b46b235f2a4f974, type: 3}
+  - footstepAudioSource: {instanceID: 0}
+  - footstepSound: {fileID: 8300000, guid: a0ccbead04ec99c4e9ddc660333de268, type: 3}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 

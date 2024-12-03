@@ -4,60 +4,49 @@ using UnityEngine;
 
 public class EnemyController : MonoBehaviour
 {
-    // Public variables
     public float speed;
     public bool vertical;
     public float changeTime = 3.0f;
 
-    // Private variables
     Rigidbody2D rigidbody2d;
     Animator animator;
     float timer;
     int direction = 1;
     bool aggressive = true;
 
-    // Particle System for smoke
     public ParticleSystem smokeParticles;
-
-    // Animation trigger for when the robot is fixed
     public string fixedAnimationTrigger = "Fixed";
 
-    // Health system
-    public int maxHealth = 2; // Enemy starts with 2 health
-    private int currentHealth; // Tracks current health
+    public int maxHealth = 2; 
+    private int currentHealth; 
 
-    // Flag to check if the robot is fixed
     bool isFixed = false;
 
-    // Start is called before the first frame update
     void Start()
     {
         rigidbody2d = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
         timer = changeTime;
 
-        currentHealth = maxHealth; // Initialize health
+        currentHealth = maxHealth;
 
-        // Start emitting smoke particles
         if (smokeParticles != null)
         {
             smokeParticles.Play();
         }
     }
 
-    // Update is called every frame
     void Update()
     {
         if (isFixed)
         {
-            // Stop moving and play the "fixed" animation once repaired
             if (smokeParticles != null && smokeParticles.isPlaying)
             {
                 smokeParticles.Stop();
             }
 
-            animator.SetTrigger(fixedAnimationTrigger); // Play the "fixed" animation
-            return; // Skip the rest of the logic if fixed
+            animator.SetTrigger(fixedAnimationTrigger);
+            return;
         }
 
         if (!aggressive)
@@ -74,12 +63,11 @@ public class EnemyController : MonoBehaviour
         }
     }
 
-    // FixedUpdate has the same call rate as the physics system
     void FixedUpdate()
     {
         if (isFixed || !aggressive)
         {
-            return; // Do not move if fixed or not aggressive
+            return;
         }
 
         Vector2 position = rigidbody2d.position;
@@ -100,7 +88,6 @@ public class EnemyController : MonoBehaviour
         rigidbody2d.MovePosition(position);
     }
 
-    // OnCollisionEnter2D to handle damage to the player
     void OnCollisionEnter2D(Collision2D other)
     {
         PlayerController player = other.gameObject.GetComponent<PlayerController>();
@@ -111,36 +98,38 @@ public class EnemyController : MonoBehaviour
         }
     }
 
-    // Method to fix the robot, stop the smoke, and play the fixed animation
     public void FixRobot()
     {
         isFixed = true;
         if (smokeParticles != null)
         {
-            smokeParticles.Stop(); // Stop the smoke particle effect
+            smokeParticles.Stop();
         }
-        animator.SetTrigger(fixedAnimationTrigger); // Trigger the "fixed" animation
+        animator.SetTrigger(fixedAnimationTrigger);
     }
 
-    // Method to handle damage and health change
     public void ChangeHealth(int amount)
     {
         currentHealth += amount;
 
-        // Ensure health doesn't drop below 0
         currentHealth = Mathf.Max(0, currentHealth);
 
-        if (currentHealth <= 0)
+        if (currentHealth <= 0 && !isFixed)
         {
-            // Stop the enemy's movement when health reaches 0
             isFixed = true;
-            aggressive = false; // Stop movement
+            aggressive = false;
             if (smokeParticles != null && smokeParticles.isPlaying)
             {
-                smokeParticles.Stop(); // Stop smoke when "dead"
+                smokeParticles.Stop();
             }
-            animator.SetTrigger("Dead"); // Trigger "dead" animation
+            animator.SetTrigger("Dead");
             Debug.Log("Enemy is destroyed");
+
+            PlayerController player = FindObjectOfType<PlayerController>();
+            if (player != null)
+            {
+            
+            }
         }
     }
 }

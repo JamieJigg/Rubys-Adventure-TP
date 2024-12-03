@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -16,7 +15,7 @@ public class PlayerController : MonoBehaviour
     int currentHealth;
     public int health { get { return currentHealth; } }
 
-    public float timeInvinvible = 2.0f;
+    public float timeInvincible = 2.0f;
     bool isInvincible;
     float damageCooldown;
 
@@ -24,7 +23,12 @@ public class PlayerController : MonoBehaviour
     Vector2 moveDirection = new Vector2(1, 0);
 
     public GameObject projectilePrefab;
+    public Transform firePoint; // Point where projectiles are fired from
     public InputAction launchAction;
+
+    public bool isSpreadShotEnabled = false; // Spread shot toggle
+    public bool isSuperPowerUpEnabled = false; // Flag for the super power-up
+    public float projectileForce = 300f; // Default projectile force
 
     AudioSource audioSource;
 
@@ -35,25 +39,32 @@ public class PlayerController : MonoBehaviour
     public ParticleSystem healthGainParticles;
     public ParticleSystem damageTakenParticles;
 
+    // AudioClip for shooting sound
+    public AudioClip shootSound;
+
     void Start()
     {
+        // Enable the move and launch actions
         MoveAction.Enable();
+        launchAction.Enable();
+
+        // Get references to required components
         rigidbody2d = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
         audioSource = GetComponent<AudioSource>();
 
-        launchAction.Enable();
+        // Set up action listeners
         launchAction.performed += Launch;
-
         talkAction.Enable();
         talkAction.performed += FindFriend;
 
+        // Initialize health
         currentHealth = maxHealth;
     }
 
     void Update()
     {
-        if (isDead) return; // Prevent movement and other actions if dead
+        if (isDead) return;
 
         move = MoveAction.ReadValue<Vector2>();
 
@@ -76,75 +87,152 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        // Handle death and restart logic
         if (currentHealth <= 0 && !isDead)
         {
-            isDead = true; // Mark the player as dead
-            gameManager?.gameOver(); // Call GameManager's gameOver method if it's assigned
+            isDead = true;
+            gameManager?.gameOver();
             Debug.Log("Dead! Press 'R' to restart.");
         }
 
-        // Wait for 'R' key to restart
         if (isDead && Input.GetKeyDown(KeyCode.R))
         {
             Debug.Log("Restarting game...");
             RestartGame();
         }
-    } // <-- Correctly added the closing brace for Update
+    }
 
     void FixedUpdate()
     {
-        if (isDead) return; // Don't move if dead
+        if (isDead) return;
 
         Vector2 position = (Vector2)rigidbody2d.position + move * speed * Time.deltaTime;
         rigidbody2d.MovePosition(position);
     }
 
-    public void ChangeHealth(int amount)
-    {
-        if (amount < 0) // Damage
-        {
-            if (isInvincible)
-            {
-                return;
-            }
-            isInvincible = true;
-            damageCooldown = timeInvinvible;
-            animator.SetTrigger("Hit");
-
-            if (damageTakenParticles != null)
-            {
-                damageTakenParticles.transform.position = transform.position;
-                damageTakenParticles.Play();
-                Destroy(damageTakenParticles.gameObject, damageTakenParticles.main.duration);
-            }
-        }
-        else if (amount > 0) // Health gain
-        {
-            if (healthGainParticles != null)
-            {
-                healthGainParticles.transform.position = transform.position;
-                healthGainParticles.Play();
-                Destroy(healthGainParticles.gameObject, healthGainParticles.main.duration);
-            }
-        }
-
-        currentHealth = Mathf.Clamp(currentHealth + amount, 0, maxHealth);
-        UIHandler.instance.SetHealthValue(currentHealth / (float)maxHealth);
-    }
-
     void Launch(InputAction.CallbackContext context)
     {
-        GameObject projectileObject = Instantiate(projectilePrefab, rigidbody2d.position + Vector2.up * 0.5f, Quaternion.identity);
-        Projectile projectile = projectileObject.GetComponent<Projectile>();
-        projectile.Launch(moveDirection, 300f);
+        if (isSuperPowerUpEnabled)
+        {
+            // Shoot 4 projectiles in each direction (Up, Down, Left, Right) - spread shots
+            FireSpreadShot(Vector2.up, 4);
+            FireSpreadShot(Vector2.down, 4);
+            FireSpreadShot(Vector2.left, 4);
+            FireSpreadShot(Vector2.right, 4);
+        }
+        else if (isSpreadShotEnabled)
+        {
+            FireProjectile(Vector2.up);
+            FireProjectile(Vector2.down);
+            FireProjectile(Vector2.left);
+            FireProjectile(Vector2.right);
+        }
+        else
+        {
+            FireProjectile(moveDirection);
+        }
+
+        // Play shooting sound
+        PlaySound(shootSound);
 
         animator.SetTrigger("Launch");
     }
 
+    private void FireSpreadShot(Vector2 direction, int numberOfProjectiles)
+    {
+        float spreadAngle = 10f; 
+        float startingAngle = -spreadAngle * (numberOfProjectiles - 1) / 2;
+
+        for (int i = 0; i < numberOfProjectiles; i++)
+        {
+            float angle = startingAngle + i * spreadAngle;
+            Vector2 spreadDirection = RotateVector(direction, angle);
+            FireProjectile(spreadDirection);
+        }
+    }
+
+    private Vector2 RotateVector(Vector2 vector, float angle)
+    {
+        float radian = angle * Mathf.Deg2Rad;
+        float cos = Mathf.Cos(radian);
+        float sin = Mathf.Sin(radian);
+
+        float x = cos * vector.x - sin * vector.y;
+        float y = sin * vector.x + cos * vector.y;
+        return new Vector2(x, y);
+    }
+
+    private void FireProjectile(Vector2 direction)
+    {
+        if (projectilePrefab != null && firePoint != null)
+        {
+            GameObject projectileObject = Instantiate(projectilePrefab, firePoint.position, Quaternion.identity);
+            Projectile projectile = projectileObject.GetComponent<Projectile>();
+            if (projectile != null)
+            {
+                projectile.Launch(direction, projectileForce);
+            }
+        }
+        else
+        {
+            Debug.LogError("projectilePrefab or firePoint is not assigned.");
+        }
+    }
+
     public void PlaySound(AudioClip clip)
     {
-        audioSource.PlayOneShot(clip);
+        if (audioSource != null && clip != null)
+        {
+            audioSource.PlayOneShot(clip);
+        }
+        else
+        {
+            Debug.LogError("audioSource or clip is not assigned.");
+        }
+    }
+
+    public void ChangeHealth(int amount)
+    {
+        if (amount < 0) 
+        {
+            if (isInvincible) return;
+
+            isInvincible = true;
+            damageCooldown = timeInvincible;
+
+            if (damageTakenParticles != null)
+            {
+                damageTakenParticles.Play();
+            }
+        }
+        else if (amount > 0) 
+        {
+            if (healthGainParticles != null)
+            {
+                healthGainParticles.Play();
+            }
+        }
+
+        currentHealth = Mathf.Clamp(currentHealth + amount, 0, maxHealth);
+        Debug.Log($"Health changed by {amount}. Current health: {currentHealth}");
+
+        if (currentHealth <= 0)
+        {
+            isDead = true;
+            gameManager?.gameOver();
+            Debug.Log("Player is dead.");
+        }
+    }
+
+    public void ActivateSuperPower()
+    {
+        isSuperPowerUpEnabled = true;
+        StartCoroutine(DeactivateSuperPowerAfterDuration());
+    }
+
+    private IEnumerator DeactivateSuperPowerAfterDuration()
+    {
+        yield return new WaitForSeconds(10f);
+        isSuperPowerUpEnabled = false;
     }
 
     void FindFriend(InputAction.CallbackContext context)
@@ -157,6 +245,7 @@ public class PlayerController : MonoBehaviour
             if (character != null)
             {
                 UIHandler.instance.DisplayDialogue();
+                character.Interact();
             }
         }
     }
